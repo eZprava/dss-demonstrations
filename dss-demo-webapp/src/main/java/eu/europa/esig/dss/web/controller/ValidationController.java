@@ -69,6 +69,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+// PDF/A validation
+import eu.europa.esig.dss.pdfa.validation.PDFADocumentValidator;
+
 @Controller
 @RequestMapping(value = "/validation")
 public class ValidationController extends AbstractValidationController {
@@ -115,7 +118,7 @@ public class ValidationController extends AbstractValidationController {
 
 	@RequestMapping(method = RequestMethod.POST)
 	public String validate(@ModelAttribute("validationForm") @Valid ValidationForm validationForm, BindingResult result,
-						   Model model, HttpServletRequest request) {
+					   Model model, HttpServletRequest request) {
 		LOG.trace("Validation BEGINS...");
 		if (result.hasErrors()) {
 			if (LOG.isDebugEnabled()) {
@@ -127,23 +130,8 @@ public class ValidationController extends AbstractValidationController {
 			return VALIDATION_TILE;
 		}
 
-		SignedDocumentValidator documentValidator = SignedDocumentValidator
-				.fromDocument(WebAppUtils.toDSSDocument(validationForm.getSignedFile()));
-		documentValidator.setCertificateVerifier(getCertificateVerifier(validationForm));
-		documentValidator.setTokenExtractionStrategy(TokenExtractionStrategy.fromParameters(validationForm.isIncludeCertificateTokens(),
-				validationForm.isIncludeTimestampTokens(), validationForm.isIncludeRevocationTokens(), false));
-		documentValidator.setIncludeSemantics(validationForm.isIncludeSemantics());
-		documentValidator.setSignaturePolicyProvider(signaturePolicyProvider);
-		documentValidator.setValidationLevel(validationForm.getValidationLevel());
-		documentValidator.setValidationTime(getValidationTime(validationForm));
-
-		TokenIdentifierProvider identifierProvider = validationForm.isIncludeUserFriendlyIdentifiers() ?
-				new UserFriendlyIdentifierProvider() : new OriginalIdentifierProvider();
-		documentValidator.setTokenIdentifierProvider(identifierProvider);
-
-		setSigningCertificate(documentValidator, validationForm);
-		setDetachedContents(documentValidator, validationForm);
-		setDetachedEvidenceRecords(documentValidator, validationForm);
+		// Prepare input doc and locale first
+		DSSDocument inputDoc = WebAppUtils.toDSSDocument(validationForm.getSignedFile());
 
 		Locale locale = request.getLocale();
 		LOG.trace("Requested locale : {}", locale);
@@ -151,7 +139,44 @@ public class ValidationController extends AbstractValidationController {
 			locale = Locale.getDefault();
 			LOG.warn("The request locale is null! Use the default one : {}", locale);
 		}
-		documentValidator.setLocale(locale);
+
+		// ================== PDF/A branch (INSERTED) ==================
+		// If the input document is a PDF, use the PDF/A validator so that
+		// SimpleReport and DiagnosticData are enriched with PDF/A results.
+		DocumentValidator documentValidator;
+		if (MimeTypeEnum.PDF.equals(inputDoc.getMimeType())) {
+			PDFADocumentValidator pdfaValidator = new PDFADocumentValidator(inputDoc);
+			pdfaValidator.setCertificateVerifier(getCertificateVerifier(validationForm));
+			pdfaValidator.setValidationLevel(validationForm.getValidationLevel());
+			pdfaValidator.setValidationTime(getValidationTime(validationForm));
+			pdfaValidator.setLocale(locale);
+			documentValidator = pdfaValidator;
+		} else {
+			// Fallback for all other formats (XML, ASiC, etc.) - original flow
+			SignedDocumentValidator sdv = SignedDocumentValidator.fromDocument(inputDoc);
+			sdv.setCertificateVerifier(getCertificateVerifier(validationForm));
+			sdv.setTokenExtractionStrategy(TokenExtractionStrategy.fromParameters(
+					validationForm.isIncludeCertificateTokens(),
+					validationForm.isIncludeTimestampTokens(),
+					validationForm.isIncludeRevocationTokens(),
+					false));
+			sdv.setIncludeSemantics(validationForm.isIncludeSemantics());
+			sdv.setSignaturePolicyProvider(signaturePolicyProvider);
+			sdv.setValidationLevel(validationForm.getValidationLevel());
+			sdv.setValidationTime(getValidationTime(validationForm));
+
+			TokenIdentifierProvider identifierProvider = validationForm.isIncludeUserFriendlyIdentifiers() ?
+					new UserFriendlyIdentifierProvider() : new OriginalIdentifierProvider();
+			sdv.setTokenIdentifierProvider(identifierProvider);
+
+			setSigningCertificate(sdv, validationForm);
+			setDetachedContents(sdv, validationForm);
+			setDetachedEvidenceRecords(sdv, validationForm);
+
+			sdv.setLocale(locale);
+			documentValidator = sdv;
+		}
+		// ================ /PDF/A branch (END INSERT) =================
 
 		Reports reports = validate(documentValidator, validationForm);
 		setAttributesModels(model, reports);
@@ -299,7 +324,7 @@ public class ValidationController extends AbstractValidationController {
 		}
 
 		try (InputStream is = new ByteArrayInputStream(diagnosticData.getBytes());
-			 OutputStream os = response.getOutputStream()) {
+				 OutputStream os = response.getOutputStream()) {
 			response.setContentType(MimeTypeEnum.XML.getMimeTypeString());
 			response.setHeader("Content-Disposition", "attachment; filename=DSS-Diagnostic-data.xml");
 			Utils.copy(is, os);
@@ -340,7 +365,7 @@ public class ValidationController extends AbstractValidationController {
 
 	@RequestMapping(value = "/download-revocation")
 	public void downloadRevocationData(@RequestParam(value = "id") String id, @RequestParam(value = "format") String format, HttpSession session,
-									   HttpServletResponse response) {
+					   HttpServletResponse response) {
 		DiagnosticData diagnosticData = getDiagnosticData(session);
 		RevocationWrapper revocationData = diagnosticData.getRevocationById(id);
 		if (revocationData == null) {
@@ -372,7 +397,7 @@ public class ValidationController extends AbstractValidationController {
 
 	@RequestMapping(value = "/download-timestamp")
 	public void downloadTimestamp(@RequestParam(value = "id") String id, @RequestParam(value = "format") String format, HttpSession session,
-								  HttpServletResponse response) {
+						  HttpServletResponse response) {
 		DiagnosticData diagnosticData = getDiagnosticData(session);
 		TimestampWrapper timestamp = diagnosticData.getTimestampById(id);
 		if (timestamp == null) {
@@ -438,3 +463,4 @@ public class ValidationController extends AbstractValidationController {
 	}
 
 }
+

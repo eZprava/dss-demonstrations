@@ -75,6 +75,13 @@ import org.springframework.context.annotation.ImportResource;
 import java.util.Collections;
 import java.util.List;
 
+// === Added for validateSigPdfA ===
+import eu.europa.esig.dss.web.restApiExt.ValidateSigPdfAResource;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+// === End added for validateSigPdfA ===
+
 @Configuration
 @ImportResource({ "classpath:META-INF/cxf/cxf.xml" }) // loads Bus cxf
 public class CXFConfig {
@@ -137,6 +144,11 @@ public class CXFConfig {
 
 	@Autowired
 	private RemoteTimestampService timestampService;
+
+	// === Added for validateSigPdfA ===
+	@Autowired
+	private ValidateSigPdfAResource validateSigPdfAResource;
+	// === End added for validateSigPdfA ===
 
 	@Bean
 	public ServletRegistrationBean<CXFServlet> cxfServlet() {
@@ -380,11 +392,26 @@ public class CXFConfig {
 	@Bean
 	public Server createServerValidationRestService() {
 		JAXRSServerFactoryBean sfb = new JAXRSServerFactoryBean();
-		sfb.setServiceBean(restValidationService());
+		// === Modified for validateSigPdfA ===
+		// Původně: sfb.setServiceBean(restValidationService());
+		// Nově registrujeme *oba* resource na stejné adrese /rest/validation:
+		sfb.setServiceBeans(Arrays.asList(
+				restValidationService(),        // původní validační endpointy (vč. /validateSignature)
+				validateSigPdfAResource         // nový endpoint /validateSigPdfA
+		));
+		// === End modified for validateSigPdfA ===
+
 		sfb.setAddress(REST_VALIDATION);
 		sfb.setProvider(jacksonJsonProvider());
 		sfb.setProvider(exceptionRestMapper());
-		sfb.setFeatures(createFeatures(RestDocumentValidationService.class.getName()));
+
+		// === Modified for validateSigPdfA ===
+		// OpenAPI musí vidět *oba* resource
+		sfb.setFeatures(createFeaturesForResources(
+				RestDocumentValidationService.class.getName(),
+				ValidateSigPdfAResource.class.getName()
+		));
+		// === End modified for validateSigPdfA ===
 		return sfb.create();
 	}
 
@@ -491,6 +518,26 @@ public class CXFConfig {
 		openApiFeature.setResourceClasses(Collections.singleton(resourcesClassName));
         return openApiFeature;
     }
+
+	// === Added for validateSigPdfA ===
+	// Pomocná varianta pro více resource tříd najednou (OpenAPI správně zobrazí oba)
+	private List<OpenApiFeature> createFeaturesForResources(String... resourceClassNames) {
+		Set<String> set = new HashSet<>(Arrays.asList(resourceClassNames));
+		return Collections.singletonList(createOpenApiFeature(set));
+	}
+
+	private OpenApiFeature createOpenApiFeature(Set<String> resourceClassNames) {
+		final OpenApiFeature openApiFeature = new OpenApiFeature();
+		openApiFeature.setCustomizer(openApiCustomizer());
+		openApiFeature.setPrettyPrint(true);
+		openApiFeature.setScan(true);
+		openApiFeature.setUseContextBasedConfig(true);
+		openApiFeature.setTitle("DSS WebServices");
+		openApiFeature.setVersion(dssVersion);
+		openApiFeature.setResourceClasses(resourceClassNames);
+		return openApiFeature;
+	}
+	// === End added for validateSigPdfA ===
 
 	private OpenApiCustomizer openApiCustomizer() {
 		OpenApiCustomizer customizer = new OpenApiCustomizer();

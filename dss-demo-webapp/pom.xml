@@ -174,6 +174,12 @@
             <artifactId>dss-evidence-record-asn1</artifactId>
         </dependency>
 
+        <!-- PDF/A validation (veraPDF přes DSS) -->
+        <dependency>
+        <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+        <artifactId>dss-pdfa</artifactId>
+        </dependency>
+
         <!-- Validation policy support -->
         <dependency>
             <groupId>eu.europa.ec.joinup.sd-dss</groupId>

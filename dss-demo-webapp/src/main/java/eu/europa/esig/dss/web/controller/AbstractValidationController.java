@@ -32,104 +32,119 @@ import java.util.TimeZone;
 @SessionAttributes({ "simpleReportXml", "simpleCertificateReportXml", "detailedReportXml", "diagnosticDataXml", "diagnosticTree" })
 public abstract class AbstractValidationController {
 
-	private static final Logger LOG = LoggerFactory.getLogger(AbstractValidationController.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractValidationController.class);
 
-	protected static final String SIMPLE_REPORT_ATTRIBUTE = "simpleReport";
-	protected static final String DETAILED_REPORT_ATTRIBUTE = "detailedReport";
-	
-	protected static final String XML_SIMPLE_REPORT_ATTRIBUTE = "simpleReportXml";
-	protected static final String XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE = "simpleCertificateReportXml";
-	protected static final String XML_DETAILED_REPORT_ATTRIBUTE = "detailedReportXml";
-	protected static final String XML_DIAGNOSTIC_DATA_ATTRIBUTE = "diagnosticDataXml";
-	protected static final String ETSI_VALIDATION_REPORT_ATTRIBUTE = "etsiValidationReport";
-	
-	protected static final String ALL_CERTIFICATES_ATTRIBUTE = "allCertificates";
-	protected static final String ALL_REVOCATION_DATA_ATTRIBUTE = "allRevocationData";
-	protected static final String ALL_TIMESTAMPS_ATTRIBUTE = "allTimestamps";
+    protected static final String SIMPLE_REPORT_ATTRIBUTE = "simpleReport";
+    protected static final String DETAILED_REPORT_ATTRIBUTE = "detailedReport";
+    
+    protected static final String XML_SIMPLE_REPORT_ATTRIBUTE = "simpleReportXml";
+    protected static final String XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE = "simpleCertificateReportXml";
+    protected static final String XML_DETAILED_REPORT_ATTRIBUTE = "detailedReportXml";
+    protected static final String XML_DIAGNOSTIC_DATA_ATTRIBUTE = "diagnosticDataXml";
+    protected static final String ETSI_VALIDATION_REPORT_ATTRIBUTE = "etsiValidationReport";
+    
+    protected static final String ALL_CERTIFICATES_ATTRIBUTE = "allCertificates";
+    protected static final String ALL_REVOCATION_DATA_ATTRIBUTE = "allRevocationData";
+    protected static final String ALL_TIMESTAMPS_ATTRIBUTE = "allTimestamps";
 
-	protected static final String XML_CRYPTOGRAPHIC_SUITE_ATTRIBUTE = "cryptographicSuiteXml";
-	protected static final String JSON_CRYPTOGRAPHIC_SUITE_ATTRIBUTE = "cryptographicSuiteJson";
+    protected static final String XML_CRYPTOGRAPHIC_SUITE_ATTRIBUTE = "cryptographicSuiteXml";
+    protected static final String JSON_CRYPTOGRAPHIC_SUITE_ATTRIBUTE = "cryptographicSuiteJson";
 
-	@Autowired
-	protected CertificateVerifier certificateVerifier;
+    @Autowired
+    protected CertificateVerifier certificateVerifier;
 
-	@Autowired
-	protected XSLTService xsltService;
+    @Autowired
+    protected XSLTService xsltService;
 
-	@Autowired(required = false)
-	private Resource cryptographicSuiteXml;
+    @Autowired(required = false)
+    private Resource cryptographicSuiteXml;
 
-	@Autowired(required = false)
-	private Resource cryptographicSuiteJson;
+    @Autowired(required = false)
+    private Resource cryptographicSuiteJson;
 
-	@InitBinder
-	public void initBinder(WebDataBinder webDataBinder) {
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
-		dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-		dateFormat.setLenient(false);
-		webDataBinder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, true));
-	}
+    @InitBinder
+    public void initBinder(WebDataBinder webDataBinder) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        dateFormat.setLenient(false);
+        webDataBinder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, true));
+    }
 
-	protected void setAttributesModels(Model model, AbstractReports reports) {
-		String xmlSimpleReport = reports.getXmlSimpleReport();
-		if (reports instanceof CertificateReports) {
-			model.addAttribute(XML_SIMPLE_REPORT_ATTRIBUTE, Utils.EMPTY_STRING);
-			model.addAttribute(XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE, xmlSimpleReport);
-			model.addAttribute(SIMPLE_REPORT_ATTRIBUTE, xsltService.generateSimpleCertificateReport(xmlSimpleReport));
-		} else {
-			model.addAttribute(XML_SIMPLE_REPORT_ATTRIBUTE, xmlSimpleReport);
-			model.addAttribute(XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE, Utils.EMPTY_STRING);
-			model.addAttribute(SIMPLE_REPORT_ATTRIBUTE, xsltService.generateSimpleReport(xmlSimpleReport));
-		}
+    protected void setAttributesModels(Model model, AbstractReports reports) {
+        String xmlSimpleReport = reports.getXmlSimpleReport();
+        if (reports instanceof CertificateReports) {
+            model.addAttribute(XML_SIMPLE_REPORT_ATTRIBUTE, Utils.EMPTY_STRING);
+            model.addAttribute(XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE, xmlSimpleReport);
+            model.addAttribute(SIMPLE_REPORT_ATTRIBUTE, xsltService.generateSimpleCertificateReport(xmlSimpleReport));
+        } else {
+            model.addAttribute(XML_SIMPLE_REPORT_ATTRIBUTE, xmlSimpleReport);
+            model.addAttribute(XML_SIMPLE_CERTIFICATE_REPORT_ATTRIBUTE, Utils.EMPTY_STRING);
+            model.addAttribute(SIMPLE_REPORT_ATTRIBUTE, xsltService.generateSimpleReport(xmlSimpleReport));
+        }
 
-		String xmlDetailedReport = reports.getXmlDetailedReport();
-		model.addAttribute(XML_DETAILED_REPORT_ATTRIBUTE, xmlDetailedReport);
-		model.addAttribute(DETAILED_REPORT_ATTRIBUTE, xsltService.generateDetailedReport(xmlDetailedReport));
+        String xmlDetailedReport = reports.getXmlDetailedReport();
+        model.addAttribute(XML_DETAILED_REPORT_ATTRIBUTE, xmlDetailedReport);
+        model.addAttribute(DETAILED_REPORT_ATTRIBUTE, xsltService.generateDetailedReport(xmlDetailedReport));
 
-		DiagnosticData diagnosticData = reports.getDiagnosticData();
-		model.addAttribute(XML_DIAGNOSTIC_DATA_ATTRIBUTE, reports.getXmlDiagnosticData());
+        DiagnosticData diagnosticData = reports.getDiagnosticData();
+        model.addAttribute(XML_DIAGNOSTIC_DATA_ATTRIBUTE, reports.getXmlDiagnosticData());
 
-		if (reports instanceof Reports) {
-			Reports sigReports = (Reports) reports;
-			ValidationReportType etsiValidationReportJaxb = sigReports.getEtsiValidationReportJaxb();
-			if (etsiValidationReportJaxb != null) {
-				model.addAttribute(ETSI_VALIDATION_REPORT_ATTRIBUTE, getEtsiValidationReportString(etsiValidationReportJaxb));
-			}
-		}
+        // ====================== PDF/A FIELDS (ADD THIS BLOCK) =======================
+        // These attributes will only be populated if the validation was done through PDFADocumentValidator
+        // (i.e., when the input document was a PDF and you used the PDF/A validator at validation time).
+        // They will appear in the UI/JSON together with the existing reports.
+        model.addAttribute("pdfaValidationPerformed", diagnosticData.isPDFAValidationPerformed());
+        model.addAttribute("pdfaCompliant", diagnosticData.isPDFACompliant());
+        try {
+            model.addAttribute("pdfaProfileId", diagnosticData.getPDFAProfileId());
+            model.addAttribute("pdfaErrors", diagnosticData.getPDFAValidationErrors());
+        } catch (Exception ignore) {
+            // Some DSS versions may not provide all fields - ignore if not available
+        }
+        // ==================== /PDF/A FIELDS (END OF INSERT) =======================
 
-		// Get Certificates for which binaries are available
-		Set<CertificateWrapper> usedCertificates = new HashSet<>(diagnosticData.getUsedCertificates());
-		model.addAttribute(ALL_CERTIFICATES_ATTRIBUTE, buildTokenDtos(usedCertificates));
+        if (reports instanceof Reports) {
+            Reports sigReports = (Reports) reports;
+            ValidationReportType etsiValidationReportJaxb = sigReports.getEtsiValidationReportJaxb();
+            if (etsiValidationReportJaxb != null) {
+                model.addAttribute(ETSI_VALIDATION_REPORT_ATTRIBUTE, getEtsiValidationReportString(etsiValidationReportJaxb));
+            }
+        }
 
-		// Get Revocation data for which binaries are available
-		model.addAttribute(ALL_REVOCATION_DATA_ATTRIBUTE, buildTokenDtos(diagnosticData.getAllRevocationData()));
+        // Get Certificates for which binaries are available
+        Set<CertificateWrapper> usedCertificates = new HashSet<>(diagnosticData.getUsedCertificates());
+        model.addAttribute(ALL_CERTIFICATES_ATTRIBUTE, buildTokenDtos(usedCertificates));
 
-		// Get Timestamps for which binaries are available
-		model.addAttribute(ALL_TIMESTAMPS_ATTRIBUTE, buildTokenDtos(diagnosticData.getTimestampList()));
-	}
+        // Get Revocation data for which binaries are available
+        model.addAttribute(ALL_REVOCATION_DATA_ATTRIBUTE, buildTokenDtos(diagnosticData.getAllRevocationData()));
 
-	protected void setCryptographicSuiteSamples(Model model) {
-		model.addAttribute(XML_CRYPTOGRAPHIC_SUITE_ATTRIBUTE, cryptographicSuiteXml);
-		model.addAttribute(JSON_CRYPTOGRAPHIC_SUITE_ATTRIBUTE, cryptographicSuiteJson);
-	}
+        // Get Timestamps for which binaries are available
+        model.addAttribute(ALL_TIMESTAMPS_ATTRIBUTE, buildTokenDtos(diagnosticData.getTimestampList()));
+    }
 
-	private Set<TokenDTO> buildTokenDtos(Collection<? extends AbstractTokenProxy> abstractTokens) {
-		Set<TokenDTO> tokenDtos = new HashSet<>();
-		for (AbstractTokenProxy token : abstractTokens) {
-			if (token.getBinaries() != null) {
-				tokenDtos.add(new TokenDTO(token));
-			}
-		}
-		return tokenDtos;
-	}
+    protected void setCryptographicSuiteSamples(Model model) {
+        model.addAttribute(XML_CRYPTOGRAPHIC_SUITE_ATTRIBUTE, cryptographicSuiteXml);
+        model.addAttribute(JSON_CRYPTOGRAPHIC_SUITE_ATTRIBUTE, cryptographicSuiteJson);
+    }
 
-	private String getEtsiValidationReportString(ValidationReportType etsiValidationReportJaxb) {
-		try {
-			return EtsiNamespaceValidationReportFacade.newFacade().marshall(etsiValidationReportJaxb, false);
-		} catch (Exception e) {
-			LOG.error("Unable to marshall ETSI Validation Report. Reason : {}", e.getMessage(), e);
-			return Utils.EMPTY_STRING;
-		}
-	}
+    private Set<TokenDTO> buildTokenDtos(Collection<? extends AbstractTokenProxy> abstractTokens) {
+        Set<TokenDTO> tokenDtos = new HashSet<>();
+        for (AbstractTokenProxy token : abstractTokens) {
+            if (token.getBinaries() != null) {
+                tokenDtos.add(new TokenDTO(token));
+            }
+        }
+        return tokenDtos;
+    }
+
+    private String getEtsiValidationReportString(ValidationReportType etsiValidationReportJaxb) {
+        try {
+            return EtsiNamespaceValidationReportFacade.newFacade().marshall(etsiValidationReportJaxb, false);
+        } catch (Exception e) {
+            LOG.error("Unable to marshall ETSI Validation Report. Reason : {}", e.getMessage(), e);
+            return Utils.EMPTY_STRING;
+        }
+    }
 
 }
+
